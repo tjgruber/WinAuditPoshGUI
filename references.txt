@@ -1,0 +1,9 @@
+https://www.virtualizationhowto.com/2016/07/set-audit-policy-powershell/
+
+https://www.rootusers.com/implement-auditing-using-windows-powershell/
+
+https://searchitchannel.techtarget.com/feature/Using-AuditPol-to-audit-Windows-users-and-set-policies
+
+https://www.morgantechspace.com/2013/11/Enable-File-System-Auditing-in-Windows.html
+
+``
