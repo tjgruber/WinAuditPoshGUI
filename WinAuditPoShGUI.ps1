@@ -142,6 +142,12 @@ $psMainWindow = [PowerShell]::Create().AddScript({
                 if ($item -eq "fileSystemListBoxLabelFILESYSTEMRIGHTS_value") {
                     $syncHash.$item.ToolTip = $syncHash.fileFolderAuditing.FileSystemRights
                 }
+                if ($item -eq "fileSystemListBoxLabelISINHERITED_value") {
+                    if ($syncHash.fileFolderAuditing.IsInherited -eq $True) {
+                        $syncHash.$item.Foreground = "Red"
+                        $syncHash.$item.FontWeight = "Bold"
+                    }
+                }
             }
             $syncHash.fileSystemEnableFolderAuditingButton.Add_MouseEnter({
                 $syncHash.StatusBarText.Text = "Further modify auditing for selected folder."
