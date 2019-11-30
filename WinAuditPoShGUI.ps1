@@ -114,55 +114,55 @@ $psMainWindow = [PowerShell]::Create().AddScript({
             [string]$selectedFolder
         )
         $syncHash.selectedFolder = $selectedFolder
-        $syncHash.fileFolderAuditing = (Get-Acl $syncHash.selectedFolder -Audit).Audit
+        $syncHash.fileFolderAuditing = (Get-Acl $syncHash.selectedFolder -Audit).Audit | Select-Object -First 1
         if ($syncHash.fileFolderAuditing.FileSystemRights) {
             # Auditing information exists for the folder. Adjust GUI accordingly.
-            $syncHash.fileSystemFolderGroupBox.Header = "Folder Auditing Details:"
-            $syncHash.fileSystemNameListBox.Visibility = "Visible"
-            $syncHash.fileSystemValueListBox.Visibility = "Visible"
-            $syncHash.Window.Height = "450"
-            $syncHash.fileSystemFolderInfoGrid.Height = "370"
-            $syncHash.fileSystemFolderGroupBox.Height = "150"
-            $syncHash.fileFolderAuditing = (Get-Acl $syncHash.selectedFolder -Audit).Audit
-            foreach ($item in $syncHash.fileSystemNameListBox.Items.Name) {
-                $syncHash.$item.Visibility = "Visible"
-                $syncHash.$item.Padding = "0"
-                $syncHash.$item.FontWeight = "Bold"
-            }
-            $syncHash.fileSystemListBoxLabelFILESYSTEMRIGHTS_value.Content = $syncHash.fileFolderAuditing.FileSystemRights
-            $syncHash.fileSystemListBoxLabelAUDITFLAGS_value.Content = $syncHash.fileFolderAuditing.AuditFlags
-            $syncHash.fileSystemListBoxLabelIDENTITYREFERENCE_value.Content = $syncHash.fileFolderAuditing.IdentityReference
-            $syncHash.fileSystemListBoxLabelISINHERITED_value.Content = $syncHash.fileFolderAuditing.IsInherited
-            foreach ($item in $syncHash.fileSystemValueListBox.Items.Name) {
-                $syncHash.$item.Visibility = "Visible"
-                $syncHash.$item.Padding = "0"
-                if ($item -eq "fileSystemListBoxLabelFOLDERNAME_value") {
-                    $syncHash.$item.ToolTip = $syncHash.selectedFolder
+            if ($syncHash.fileFolderAuditing.Count -le 1) {
+                $syncHash.fileSystemFolderGroupBox.Header = "Folder Auditing Details:"
+                $syncHash.fileSystemNameListBox.Visibility = "Visible"
+                $syncHash.fileSystemValueListBox.Visibility = "Visible"
+                $syncHash.Window.Height = "450"
+                $syncHash.fileSystemFolderInfoGrid.Height = "370"
+                $syncHash.fileSystemFolderGroupBox.Height = "150"
+                foreach ($item in $syncHash.fileSystemNameListBox.Items.Name) {
+                    $syncHash.$item.Visibility = "Visible"
+                    $syncHash.$item.Padding = "0"
+                    $syncHash.$item.FontWeight = "Bold"
                 }
-                if ($item -eq "fileSystemListBoxLabelFILESYSTEMRIGHTS_value") {
-                    $syncHash.$item.ToolTip = $syncHash.fileFolderAuditing.FileSystemRights
-                }
-                if ($item -eq "fileSystemListBoxLabelISINHERITED_value") {
-                    if ($syncHash.fileFolderAuditing.IsInherited -eq $True) {
-                        $syncHash.$item.Foreground = "Red"
-                        $syncHash.$item.FontWeight = "Bold"
-                    } else {
-                        $syncHash.$item.Foreground = "Black"
-                        $syncHash.$item.FontWeight = "Normal"
+                $syncHash.fileSystemListBoxLabelFILESYSTEMRIGHTS_value.Content = $syncHash.fileFolderAuditing.FileSystemRights
+                $syncHash.fileSystemListBoxLabelAUDITFLAGS_value.Content = $syncHash.fileFolderAuditing.AuditFlags
+                $syncHash.fileSystemListBoxLabelIDENTITYREFERENCE_value.Content = $syncHash.fileFolderAuditing.IdentityReference
+                $syncHash.fileSystemListBoxLabelISINHERITED_value.Content = $syncHash.fileFolderAuditing.IsInherited
+                foreach ($item in $syncHash.fileSystemValueListBox.Items.Name) {
+                    $syncHash.$item.Visibility = "Visible"
+                    $syncHash.$item.Padding = "0"
+                    if ($item -eq "fileSystemListBoxLabelFOLDERNAME_value") {
+                        $syncHash.$item.ToolTip = $syncHash.selectedFolder
+                    }
+                    if ($item -eq "fileSystemListBoxLabelFILESYSTEMRIGHTS_value") {
+                        $syncHash.$item.ToolTip = $syncHash.fileFolderAuditing.FileSystemRights
+                    }
+                    if ($item -eq "fileSystemListBoxLabelISINHERITED_value") {
+                        if ($syncHash.fileFolderAuditing.IsInherited -eq $True) {
+                            $syncHash.$item.Foreground = "Red"
+                            $syncHash.$item.FontWeight = "Bold"
+                        } else {
+                            $syncHash.$item.Foreground = "Black"
+                            $syncHash.$item.FontWeight = "Normal"
+                        }
                     }
                 }
+                $syncHash.fileSystemEnableFolderAuditingButton.Add_MouseEnter({
+                    $syncHash.StatusBarText.Text = "Further modify auditing for selected folder."
+                })
+                $syncHash.fileSystemRemoveFolderAuditingButton.Add_MouseEnter({
+                    $syncHash.StatusBarText.Text = "Remove all auditing for selected folder."
+                })
+                $syncHash.fileSystemEnableFolderAuditingButton.Width = "164"
+                $syncHash.fileSystemEnableFolderAuditingButton.Visibility = "Visible"
+                $syncHash.fileSystemEnableFolderAuditingButton.Content = "Modify"
+                $syncHash.fileSystemRemoveFolderAuditingButton.Visibility = "Visible"
             }
-            $syncHash.fileSystemEnableFolderAuditingButton.Add_MouseEnter({
-                $syncHash.StatusBarText.Text = "Further modify auditing for selected folder."
-            })
-            $syncHash.fileSystemRemoveFolderAuditingButton.Add_MouseEnter({
-                $syncHash.StatusBarText.Text = "Remove all auditing for selected folder."
-            })
-            $syncHash.fileSystemEnableFolderAuditingButton.Width = "164"
-            $syncHash.fileSystemEnableFolderAuditingButton.Visibility = "Visible"
-            $syncHash.fileSystemEnableFolderAuditingButton.Content = "Modify"
-            $syncHash.fileSystemRemoveFolderAuditingButton.Visibility = "Visible"
-
         } else {
             $syncHash.fileSystemFolderGroupBox.Header = "Auditing is not enabled for selected folder."
             $syncHash.fileSystemNameListBox.Visibility = "Hidden"
