@@ -12,6 +12,30 @@ https://github.com/tjgruber/WinAuditPoshGUI
         [Switch]$NoGUI #will be used in future
     )
 
+    #region Update-Control is used for testing:
+    Function Update-Control {
+        Param (
+            $Control,
+            $Property,
+            $Value,
+            [switch]$AppendContent
+        )
+        If ($Property -eq "Close") {
+            $syncHash.Window.Dispatcher.invoke([action]{$syncHash.Window.Close()},"Normal")
+            Return
+        }
+        # This updates the control based on the parameters passed to the function
+        $syncHash.$Control.Dispatcher.Invoke([action]{
+            # This bit is only really meaningful for the TextBox control, which might be useful for logging progress steps
+            If ($PSBoundParameters['AppendContent']) {
+                $syncHash.$Control.AppendText($Value)
+            } Else {
+                $syncHash.$Control.$Property = $Value
+            }
+        }, "Normal")
+    }
+#endregion
+
 #===========================================================================
 #region Run script as elevated admin and unrestricted executionpolicy
 #===========================================================================
@@ -24,7 +48,7 @@ https://github.com/tjgruber/WinAuditPoshGUI
         $Host.UI.RawUI.BackgroundColor = "DarkBlue"
         Clear-Host
     } else {
-        Start-Process PowerShell.exe -ArgumentList "-ExecutionPolicy ByPass -NoExit $($script:MyInvocation.MyCommand.Path)" -Verb RunAs
+        Start-Process PowerShell.exe -ArgumentList "-ExecutionPolicy Unrestricted -NoExit $($script:MyInvocation.MyCommand.Path)" -Verb RunAs
         Exit
     }
 #endregion
@@ -116,6 +140,7 @@ $psMainWindow = [PowerShell]::Create().AddScript({
         $syncHash.selectedFolder = $selectedFolder
         $syncHash.fileFolderAuditing = (Get-Acl $syncHash.selectedFolder -Audit).Audit
         if ($syncHash.fileFolderAuditing.FileSystemRights) {
+            # Auditing information exists for the folder. Adjust GUI accordingly.
             $syncHash.fileSystemFolderGroupBox.Header = "Folder Auditing Details:"
             $syncHash.fileSystemNameListBox.Visibility = "Visible"
             $syncHash.fileSystemValueListBox.Visibility = "Visible"
