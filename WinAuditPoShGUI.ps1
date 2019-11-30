@@ -146,6 +146,9 @@ $psMainWindow = [PowerShell]::Create().AddScript({
                     if ($syncHash.fileFolderAuditing.IsInherited -eq $True) {
                         $syncHash.$item.Foreground = "Red"
                         $syncHash.$item.FontWeight = "Bold"
+                    } else {
+                        $syncHash.$item.Foreground = "Black"
+                        $syncHash.$item.FontWeight = "Normal"
                     }
                 }
             }
