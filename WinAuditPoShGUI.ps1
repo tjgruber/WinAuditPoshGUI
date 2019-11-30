@@ -12,30 +12,6 @@ https://github.com/tjgruber/WinAuditPoshGUI
         [Switch]$NoGUI #will be used in future
     )
 
-    #region Update-Control is used for testing:
-    Function Update-Control {
-        Param (
-            $Control,
-            $Property,
-            $Value,
-            [switch]$AppendContent
-        )
-        If ($Property -eq "Close") {
-            $syncHash.Window.Dispatcher.invoke([action]{$syncHash.Window.Close()},"Normal")
-            Return
-        }
-        # This updates the control based on the parameters passed to the function
-        $syncHash.$Control.Dispatcher.Invoke([action]{
-            # This bit is only really meaningful for the TextBox control, which might be useful for logging progress steps
-            If ($PSBoundParameters['AppendContent']) {
-                $syncHash.$Control.AppendText($Value)
-            } Else {
-                $syncHash.$Control.$Property = $Value
-            }
-        }, "Normal")
-    }
-#endregion
-
 #===========================================================================
 #region Run script as elevated admin and unrestricted executionpolicy
 #===========================================================================
@@ -170,8 +146,13 @@ $psMainWindow = [PowerShell]::Create().AddScript({
             $syncHash.fileSystemEnableFolderAuditingButton.Add_MouseEnter({
                 $syncHash.StatusBarText.Text = "Further modify auditing for selected folder."
             })
+            $syncHash.fileSystemRemoveFolderAuditingButton.Add_MouseEnter({
+                $syncHash.StatusBarText.Text = "Remove all auditing for selected folder."
+            })
+            $syncHash.fileSystemEnableFolderAuditingButton.Width = "164"
             $syncHash.fileSystemEnableFolderAuditingButton.Visibility = "Visible"
             $syncHash.fileSystemEnableFolderAuditingButton.Content = "Modify"
+            $syncHash.fileSystemRemoveFolderAuditingButton.Visibility = "Visible"
 
         } else {
             $syncHash.fileSystemFolderGroupBox.Header = "Auditing is not enabled for selected folder."
@@ -181,6 +162,8 @@ $psMainWindow = [PowerShell]::Create().AddScript({
             $syncHash.fileSystemEnableFolderAuditingButton.Add_MouseEnter({
                 $syncHash.StatusBarText.Text = "Enable 'Full' rights auditing for everyone on selected folder."
             })
+            $syncHash.fileSystemRemoveFolderAuditingButton.Visibility = "Hidden"
+            $syncHash.fileSystemEnableFolderAuditingButton.Width = "332"
             $syncHash.fileSystemEnableFolderAuditingButton.Visibility = "Visible"
             $syncHash.Window.Height = "340"
             $syncHash.fileSystemFolderGroupBox.Height = "50"
@@ -223,7 +206,10 @@ $psMainWindow = [PowerShell]::Create().AddScript({
                         <Label Content=" to enable any file and folder auditing." VerticalAlignment="Top" HorizontalAlignment="Left" Margin="66,90,0,0" Height="33" FontSize="14" Width="259" />
                         <GroupBox Name="fileSystemFolderGroupBox" Header="No Folder Selected..." HorizontalAlignment="Left" Margin="10,187,0,0" VerticalAlignment="Top" Width="344" Height="30">
                             <DockPanel>
-                                <Button Name="fileSystemEnableFolderAuditingButton" DockPanel.Dock="Bottom" Visibility="Hidden" Content="Enable" FontSize="14" FontWeight="Medium" VerticalAlignment="Top" Margin="0,5,0,0" Padding="10,1" />
+                                <DockPanel DockPanel.Dock="Bottom" Margin="0,5,0,0">
+                                    <Button Name="fileSystemEnableFolderAuditingButton" DockPanel.Dock="Right" Visibility="Hidden" Content="Enable" FontSize="14" FontWeight="Medium" VerticalAlignment="Top" Padding="10,1" Width="164" HorizontalAlignment="Right" />
+                                    <Button Name="fileSystemRemoveFolderAuditingButton" DockPanel.Dock="Left" Visibility="Hidden" Content="Remove" FontSize="14" FontWeight="Medium" VerticalAlignment="Top" Padding="10,1" Width="164" HorizontalAlignment="Left" />
+                                </DockPanel>
                                 <ListBox Name="fileSystemValueListBox" DockPanel.Dock="Right" MinWidth="212" MaxWidth="212" Visibility="Hidden" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
                                     <Label Name="fileSystemListBoxLabelFOLDERNAME_value" Visibility="Hidden"/>
                                     <Label Name="fileSystemListBoxLabelFILESYSTEMRIGHTS_value" Visibility="Hidden"/>
@@ -317,15 +303,40 @@ $psMainWindow = [PowerShell]::Create().AddScript({
         }
     })
 
+    $syncHash.fileSystemRemoveFolderAuditingButton.Add_MouseLeave({
+        if ($syncHash.selectedFolder) {
+            $syncHash.StatusBarText.Text = "Selected folder: $($syncHash.selectedFolder)"
+        } else {
+            $syncHash.StatusBarText.Text = "Ready..."
+        }
+    })
+
     $syncHash.fileSystemEnableFolderAuditingButton.Add_Click({
         if ($syncHash.fileSystemEnableFolderAuditingButton.Content -eq "Enable") {
-            $IdentityReference = "Everyone"
-            $FileSystemRights = "DeleteSubdirectoriesAndFiles, Modify, ChangePermissions, TakeOwnership"
-            $InheritanceFlags = "ContainerInherit, ObjectInherit"
-            $AuditFlags = "Success, Failure"
-            $AccessRule = New-Object System.Security.AccessControl.FileSystemAuditRule($IdentityReference,$FileSystemRights,$InheritanceFlags,"None",$AuditFlags)
+            $fileSystemRights = "DeleteSubdirectoriesAndFiles, Modify, ChangePermissions, TakeOwnership"
+            $auditFlags = "Success, Failure"
+            $identityReference = "Everyone"
+            $inheritanceFlags = "ContainerInherit, ObjectInherit"
+            $PropagationFlags = "None"
+            $auditRule = New-Object System.Security.AccessControl.FileSystemAuditRule($identityReference,$fileSystemRights,$inheritanceFlags,$PropagationFlags,$auditFlags)
             $selectedACL = Get-Acl -Path $syncHash.selectedFolder
-            $selectedACL.SetAuditRule($AccessRule)
+            $selectedACL.SetAuditRule($auditRule)
+            $selectedACL | Set-Acl -Path $syncHash.selectedFolder
+            Invoke-SelectedFolderAclCheck -selectedFolder $syncHash.selectedFolder
+        }
+    })
+
+    $syncHash.fileSystemRemoveFolderAuditingButton.Add_Click({
+        if ($syncHash.fileSystemRemoveFolderAuditingButton.Content -eq "Remove") {
+            $selectedACLAudit = Get-Acl -Path $syncHash.selectedFolder -Audit
+            $fileSystemRights = $selectedACLAudit.Audit.FileSystemRights
+            $auditFlags = $selectedACLAudit.Audit.AuditFlags
+            $identityReference = $selectedACLAudit.Audit.IdentityReference
+            $inheritanceFlags = $selectedACLAudit.Audit.InheritanceFlags
+            $PropagationFlags = $selectedACLAudit.Audit.PropagationFlags
+            $auditRule = New-Object System.Security.AccessControl.FileSystemAuditRule($identityReference,$fileSystemRights,$inheritanceFlags,$PropagationFlags,$auditFlags)
+            $selectedACL = Get-Acl -Path $syncHash.selectedFolder
+            $selectedACL.RemoveAuditRule($auditRule)
             $selectedACL | Set-Acl -Path $syncHash.selectedFolder
             Invoke-SelectedFolderAclCheck -selectedFolder $syncHash.selectedFolder
         }
@@ -347,8 +358,7 @@ if (-not($NoGUI)) {
 <#
 
 == To Do ==============================================================
-    1. Add 'Remove' button under 'Modify' to remove folder auditing.
-    2. Have the 'Modify' button open up selected folder properties.
+    1. Have the 'Modify' button open up selected folder properties.
 =======================================================================
 
 $psMainWindow.EndInvoke($main)
