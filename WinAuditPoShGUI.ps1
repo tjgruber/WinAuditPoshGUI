@@ -1,7 +1,7 @@
 <# WinAuditPoShGUI | by Timothy Gruber
 
 Windows Auditing PowerShell GUI
-    Version: 2019.12.03.03
+    Version: 2019.12.03.04
 
 Designed and written by Timothy Gruber:
     https://timothygruber.com
