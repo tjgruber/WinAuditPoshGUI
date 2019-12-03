@@ -131,7 +131,6 @@ $psMainWindow = [PowerShell]::Create().AddScript({
         $syncHash.fileSystemDataGrid.GridLinesVisibility = "None"
         $syncHash.fileSystemDataGrid.IsReadOnly = $True
         $syncHash.fileSystemDataGrid.CanUserAddRows = $False
-        ($syncHash.dataTable.Rows | Where-Object {$_.Keys -eq "Is Inherited?" -and $_.Values -eq $True}).Foreground = "Red"
     }#end Invoke-FileSystemAuditDataTable
 
     function Invoke-SelectedFolderAclCheck {
