@@ -1,7 +1,7 @@
 <# WinAuditPoShGUI | by Timothy Gruber
 
 Windows Auditing PowerShell GUI
-    Version: 2019.12.03.02
+    Version: 2019.12.03.03
 
 Designed and written by Timothy Gruber:
     https://timothygruber.com
@@ -154,15 +154,15 @@ $psMainWindow = [PowerShell]::Create().AddScript({
                 $syncHash.fileSystemFolderInfoGrid.Height = "355"
                 $syncHash.fileSystemFolderGroupBox.Height = "155"
             }
-            $syncHash.fileSystemEnableFolderAuditingButton.Add_MouseEnter({
+            $syncHash.fileSystemModifyFolderAuditingButton.Add_MouseEnter({
                 $syncHash.StatusBarText.Text = "Further modify auditing for selected folder."
             })
             $syncHash.fileSystemRemoveFolderAuditingButton.Add_MouseEnter({
                 $syncHash.StatusBarText.Text = "Remove all auditing for selected folder."
             })
-            $syncHash.fileSystemEnableFolderAuditingButton.Width = "164"
-            $syncHash.fileSystemEnableFolderAuditingButton.Visibility = "Visible"
-            $syncHash.fileSystemEnableFolderAuditingButton.Content = "Modify"
+            $syncHash.fileSystemEnableFolderAuditingButton.Visibility = "Hidden"
+            $syncHash.fileSystemEnableFolderAuditingButton.Width = "0"
+            $syncHash.fileSystemModifyFolderAuditingButton.Visibility = "Visible"
             $syncHash.fileSystemRemoveFolderAuditingButton.Visibility = "Visible"
         } else {
             $syncHash.fileSystemFolderGroupBox.Header = "Auditing is not enabled for selected folder."
@@ -217,6 +217,7 @@ $psMainWindow = [PowerShell]::Create().AddScript({
                             <DockPanel>
                                 <DockPanel DockPanel.Dock="Bottom" Margin="0,5,0,0">
                                     <Button Name="fileSystemEnableFolderAuditingButton" DockPanel.Dock="Right" Visibility="Hidden" Content="Enable" FontSize="14" FontWeight="Medium" VerticalAlignment="Top" Padding="10,1" Width="164" HorizontalAlignment="Right" />
+                                    <Button Name="fileSystemModifyFolderAuditingButton" DockPanel.Dock="Right" Visibility="Hidden" Content="Modify" FontSize="14" FontWeight="Medium" VerticalAlignment="Top" Padding="10,1" Width="164" HorizontalAlignment="Right" />
                                     <Button Name="fileSystemRemoveFolderAuditingButton" DockPanel.Dock="Left" Visibility="Hidden" Content="Remove" FontSize="14" FontWeight="Medium" VerticalAlignment="Top" Padding="10,1" Width="164" HorizontalAlignment="Left" />
                                 </DockPanel>
                                 <DataGrid DockPanel.Dock="Top" Name="fileSystemDataGrid" HorizontalScrollBarVisibility="Visible" SelectionMode="Single" HeadersVisibility="None" Visibility="Hidden">
@@ -311,6 +312,14 @@ $psMainWindow = [PowerShell]::Create().AddScript({
         }
     })
 
+    $syncHash.fileSystemModifyFolderAuditingButton.Add_MouseLeave({
+        if ($syncHash.selectedFolder) {
+            $syncHash.StatusBarText.Text = "Selected folder: $($syncHash.selectedFolder)"
+        } else {
+            $syncHash.StatusBarText.Text = "Ready..."
+        }
+    })
+
     $syncHash.fileSystemRemoveFolderAuditingButton.Add_MouseLeave({
         if ($syncHash.selectedFolder) {
             $syncHash.StatusBarText.Text = "Selected folder: $($syncHash.selectedFolder)"
@@ -346,6 +355,15 @@ $psMainWindow = [PowerShell]::Create().AddScript({
             $selectedACL = Get-Acl -Path $syncHash.selectedFolder
             $selectedACL.RemoveAuditRule($auditRule)
             $selectedACL | Set-Acl -Path $syncHash.selectedFolder
+            Invoke-SelectedFolderAclCheck -selectedFolder $syncHash.selectedFolder
+        }
+    })
+
+    $syncHash.fileSystemModifyFolderAuditingButton.Add_Click({
+        if ($syncHash.fileSystemModifyFolderAuditingButton.Content -eq "Modify") {
+            $shellobj = New-Object -com Shell.Application
+            $folder = $shellobj.NameSpace("$($syncHash.selectedFolder)")
+            $folder.Self.InvokeVerb("Properties")
             Invoke-SelectedFolderAclCheck -selectedFolder $syncHash.selectedFolder
         }
     })
