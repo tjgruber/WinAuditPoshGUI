@@ -1,9 +1,11 @@
 <# WinAuditPoShGUI | by Timothy Gruber
 
-In progress.
+Windows Auditing PowerShell GUI
+    Version: 2019.12.03.01
 
-https://timothygruber.com
-https://github.com/tjgruber/WinAuditPoshGUI
+Designed and written by Timothy Gruber:
+    https://timothygruber.com
+    https://github.com/tjgruber/WinAuditPoshGUI
 
 #>
 
@@ -12,15 +14,12 @@ https://github.com/tjgruber/WinAuditPoshGUI
         [Switch]$NoGUI #will be used in future
     )
 
-#===========================================================================
 #region Run script as elevated admin and unrestricted executionpolicy
-#===========================================================================
-
     $myWindowsID = [System.Security.Principal.WindowsIdentity]::GetCurrent()
     $myWindowsPrincipal = New-Object System.Security.Principal.WindowsPrincipal($myWindowsID)
     $adminRole = [System.Security.Principal.WindowsBuiltInRole]::Administrator
     if ($myWindowsPrincipal.IsInRole($adminRole)) {
-        $Host.UI.RawUI.WindowTitle = $myInvocation.MyCommand.Definition + "(Elevated)"
+        $Host.UI.RawUI.WindowTitle = "WinAuditPoShGUI | by Timothy Gruber"
         $Host.UI.RawUI.BackgroundColor = "DarkBlue"
         Clear-Host
     } else {
@@ -67,7 +66,7 @@ $psMainWindow = [PowerShell]::Create().AddScript({
 {Policy*:$Policy} {SecuritySetting:No Auditing}
 "@
     $definedMatch | ConvertFrom-String -TemplateContent $template
-    }
+    }#end Get-AuditPolicy
 
     function Invoke-FileSystemSliderCheck {
         [cmdletbinding()]
@@ -96,7 +95,7 @@ $psMainWindow = [PowerShell]::Create().AddScript({
             }
             Default {}
         }
-    }
+    }#end Invoke-FileSystemSliderCheck
 
     # Get-Folder function is from https://stackoverflow.com/a/57494414
     function Get-Folder($initialDirectory) {
@@ -108,65 +107,71 @@ $psMainWindow = [PowerShell]::Create().AddScript({
         return $FolderBrowserDialog.SelectedPath
     }
 
+    function Invoke-FileSystemAuditDataTable {
+        [cmdletbinding()]
+        param()
+        $columns = @(
+            'Keys'
+            'Values'
+        )
+        $syncHash.dataTable = New-Object System.Data.DataTable
+        [void]$syncHash.dataTable.Columns.AddRange($columns)
+        foreach ($aclAuditProperty in $syncHash.fileFolderAuditing) {
+            $aclAuditObjects = [PSCustomObject]@(
+                @{'Folder Name:' = $syncHash.selectedFolder}
+                @{'Audit Rights:' = $aclAuditProperty.FileSystemRights}
+                @{'Audit Flags:' = $aclAuditProperty.AuditFlags}
+                @{'Audit Who?' = $aclAuditProperty.IdentityReference.Value}
+                @{'Is Inherited?' = [string]$aclAuditProperty.IsInherited}
+            )
+            foreach ($aclAuditObject in $aclAuditObjects) {
+                $dataTableRow = @()
+                foreach ($column in $columns) {
+                    $dataTableRow += $aclAuditObject.$column
+                }
+                [void]$syncHash.dataTable.Rows.Add($dataTableRow)
+            }
+        }
+        $syncHash.fileSystemDataGrid.ItemsSource = $syncHash.dataTable.DefaultView
+        $syncHash.fileSystemDataGrid.GridLinesVisibility = "None"
+        $syncHash.fileSystemDataGrid.IsReadOnly = $True
+        $syncHash.fileSystemDataGrid.CanUserAddRows = $False
+        ($syncHash.dataTable.Rows | Where-Object {$_.Keys -eq "Is Inherited?" -and $_.Values -eq $True}).Foreground = "Red"
+    }#end Invoke-FileSystemAuditDataTable
+
     function Invoke-SelectedFolderAclCheck {
         [cmdletbinding()]
         param(
             [string]$selectedFolder
         )
         $syncHash.selectedFolder = $selectedFolder
-        $syncHash.fileFolderAuditing = (Get-Acl $syncHash.selectedFolder -Audit).Audit | Select-Object -First 1
+        $syncHash.fileFolderAuditing = (Get-Acl $syncHash.selectedFolder -Audit).Audit
         if ($syncHash.fileFolderAuditing.FileSystemRights) {
-            # Auditing information exists for the folder. Adjust GUI accordingly.
-            if ($syncHash.fileFolderAuditing.Count -le 1) {
-                $syncHash.fileSystemFolderGroupBox.Header = "Folder Auditing Details:"
-                $syncHash.fileSystemNameListBox.Visibility = "Visible"
-                $syncHash.fileSystemValueListBox.Visibility = "Visible"
+            Invoke-FileSystemAuditDataTable
+            $syncHash.fileSystemFolderGroupBox.Header = "Folder Auditing Details:"
+            $syncHash.fileSystemDataGrid.Visibility = "Visible"
+            if ($syncHash.fileFolderAuditing.Count -gt 1) {
+                $syncHash.Window.Height = "530"
+                $syncHash.fileSystemFolderInfoGrid.Height = "435"
+                $syncHash.fileSystemFolderGroupBox.Height = "240"
+            } else {
                 $syncHash.Window.Height = "450"
-                $syncHash.fileSystemFolderInfoGrid.Height = "370"
-                $syncHash.fileSystemFolderGroupBox.Height = "150"
-                foreach ($item in $syncHash.fileSystemNameListBox.Items.Name) {
-                    $syncHash.$item.Visibility = "Visible"
-                    $syncHash.$item.Padding = "0"
-                    $syncHash.$item.FontWeight = "Bold"
-                }
-                $syncHash.fileSystemListBoxLabelFILESYSTEMRIGHTS_value.Content = $syncHash.fileFolderAuditing.FileSystemRights
-                $syncHash.fileSystemListBoxLabelAUDITFLAGS_value.Content = $syncHash.fileFolderAuditing.AuditFlags
-                $syncHash.fileSystemListBoxLabelIDENTITYREFERENCE_value.Content = $syncHash.fileFolderAuditing.IdentityReference
-                $syncHash.fileSystemListBoxLabelISINHERITED_value.Content = $syncHash.fileFolderAuditing.IsInherited
-                foreach ($item in $syncHash.fileSystemValueListBox.Items.Name) {
-                    $syncHash.$item.Visibility = "Visible"
-                    $syncHash.$item.Padding = "0"
-                    if ($item -eq "fileSystemListBoxLabelFOLDERNAME_value") {
-                        $syncHash.$item.ToolTip = $syncHash.selectedFolder
-                    }
-                    if ($item -eq "fileSystemListBoxLabelFILESYSTEMRIGHTS_value") {
-                        $syncHash.$item.ToolTip = $syncHash.fileFolderAuditing.FileSystemRights
-                    }
-                    if ($item -eq "fileSystemListBoxLabelISINHERITED_value") {
-                        if ($syncHash.fileFolderAuditing.IsInherited -eq $True) {
-                            $syncHash.$item.Foreground = "Red"
-                            $syncHash.$item.FontWeight = "Bold"
-                        } else {
-                            $syncHash.$item.Foreground = "Black"
-                            $syncHash.$item.FontWeight = "Normal"
-                        }
-                    }
-                }
-                $syncHash.fileSystemEnableFolderAuditingButton.Add_MouseEnter({
-                    $syncHash.StatusBarText.Text = "Further modify auditing for selected folder."
-                })
-                $syncHash.fileSystemRemoveFolderAuditingButton.Add_MouseEnter({
-                    $syncHash.StatusBarText.Text = "Remove all auditing for selected folder."
-                })
-                $syncHash.fileSystemEnableFolderAuditingButton.Width = "164"
-                $syncHash.fileSystemEnableFolderAuditingButton.Visibility = "Visible"
-                $syncHash.fileSystemEnableFolderAuditingButton.Content = "Modify"
-                $syncHash.fileSystemRemoveFolderAuditingButton.Visibility = "Visible"
+                $syncHash.fileSystemFolderInfoGrid.Height = "355"
+                $syncHash.fileSystemFolderGroupBox.Height = "155"
             }
+            $syncHash.fileSystemEnableFolderAuditingButton.Add_MouseEnter({
+                $syncHash.StatusBarText.Text = "Further modify auditing for selected folder."
+            })
+            $syncHash.fileSystemRemoveFolderAuditingButton.Add_MouseEnter({
+                $syncHash.StatusBarText.Text = "Remove all auditing for selected folder."
+            })
+            $syncHash.fileSystemEnableFolderAuditingButton.Width = "164"
+            $syncHash.fileSystemEnableFolderAuditingButton.Visibility = "Visible"
+            $syncHash.fileSystemEnableFolderAuditingButton.Content = "Modify"
+            $syncHash.fileSystemRemoveFolderAuditingButton.Visibility = "Visible"
         } else {
             $syncHash.fileSystemFolderGroupBox.Header = "Auditing is not enabled for selected folder."
-            $syncHash.fileSystemNameListBox.Visibility = "Hidden"
-            $syncHash.fileSystemValueListBox.Visibility = "Hidden"
+            $syncHash.fileSystemDataGrid.Visibility = "Hidden"
             $syncHash.fileSystemEnableFolderAuditingButton.Content = "Enable"
             $syncHash.fileSystemEnableFolderAuditingButton.Add_MouseEnter({
                 $syncHash.StatusBarText.Text = "Enable 'Full' rights auditing for everyone on selected folder."
@@ -176,7 +181,7 @@ $psMainWindow = [PowerShell]::Create().AddScript({
             $syncHash.fileSystemEnableFolderAuditingButton.Visibility = "Visible"
             $syncHash.Window.Height = "340"
             $syncHash.fileSystemFolderGroupBox.Height = "50"
-        }#end if
+        }
 
     }#end Invoke-SelectedFolderAclCheck
 
@@ -219,20 +224,22 @@ $psMainWindow = [PowerShell]::Create().AddScript({
                                     <Button Name="fileSystemEnableFolderAuditingButton" DockPanel.Dock="Right" Visibility="Hidden" Content="Enable" FontSize="14" FontWeight="Medium" VerticalAlignment="Top" Padding="10,1" Width="164" HorizontalAlignment="Right" />
                                     <Button Name="fileSystemRemoveFolderAuditingButton" DockPanel.Dock="Left" Visibility="Hidden" Content="Remove" FontSize="14" FontWeight="Medium" VerticalAlignment="Top" Padding="10,1" Width="164" HorizontalAlignment="Left" />
                                 </DockPanel>
-                                <ListBox Name="fileSystemValueListBox" DockPanel.Dock="Right" MinWidth="212" MaxWidth="212" Visibility="Hidden" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                                    <Label Name="fileSystemListBoxLabelFOLDERNAME_value" Visibility="Hidden"/>
-                                    <Label Name="fileSystemListBoxLabelFILESYSTEMRIGHTS_value" Visibility="Hidden"/>
-                                    <Label Name="fileSystemListBoxLabelAUDITFLAGS_value" Visibility="Hidden"/>
-                                    <Label Name="fileSystemListBoxLabelIDENTITYREFERENCE_value" Visibility="Hidden"/>
-                                    <Label Name="fileSystemListBoxLabelISINHERITED_value" Visibility="Hidden"/>
-                                </ListBox>
-                                <ListBox Name="fileSystemNameListBox" DockPanel.Dock="Left" HorizontalAlignment="Left" MinWidth="120" MaxWidth="120" Visibility="Hidden" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                                    <Label Name="fileSystemListBoxLabelFOLDERNAME" Visibility="Hidden" Content="Folder Name:"/>
-                                    <Label Name="fileSystemListBoxLabelFILESYSTEMRIGHTS" Visibility="Hidden" Content="Audit Rights:"/>
-                                    <Label Name="fileSystemListBoxLabelAUDITFLAGS" Visibility="Hidden" Content="Audit Flags:"/>
-                                    <Label Name="fileSystemListBoxLabelIDENTITYREFERENCE" Visibility="Hidden" Content="Audit Who?"/>
-                                    <Label Name="fileSystemListBoxLabelISINHERITED" Visibility="Hidden" Content="Is Inherited?"/>
-                                </ListBox>
+                                <DataGrid DockPanel.Dock="Top" Name="fileSystemDataGrid" HorizontalScrollBarVisibility="Visible" SelectionMode="Single" HeadersVisibility="None" Visibility="Hidden">
+                                    <DataGrid.RowStyle>
+                                        <Style TargetType="DataGridRow">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Values}" Value="True">
+                                                    <Setter Property="Foreground" Value="Red" />
+                                                    <Setter Property="FontWeight" Value="Medium" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Keys}" Value="Folder Name:">
+                                                    <Setter Property="Background" Value="#F3F3F3" />
+                                                    <Setter Property="FontWeight" Value="Medium" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGrid.RowStyle>
+                                </DataGrid>
                             </DockPanel>
                         </GroupBox>
                     </Grid>
@@ -270,11 +277,11 @@ $psMainWindow = [PowerShell]::Create().AddScript({
     $syncHash.fileSystemSlider.Add_ValueChanged({
         switch ($syncHash.fileSystemSlider.Value) {
             1 {
-                $enableFileSystem = (auditpol /set /subcategory:"File System" /success:enable /failure:enable)
+                [void](auditpol /set /subcategory:"File System" /success:enable /failure:enable)
                 Invoke-FileSystemSliderCheck
             }
             Default {
-                $disableFileSystem = (auditpol /set /subcategory:"File System" /success:disable /failure:disable)
+                [void](auditpol /set /subcategory:"File System" /success:disable /failure:disable)
                 Invoke-FileSystemSliderCheck
             }
         }
@@ -295,13 +302,10 @@ $psMainWindow = [PowerShell]::Create().AddScript({
     $syncHash.fileSystemSelectFolderButton.Add_Click({
         $syncHash.selectedFolder = Get-Folder "$env:USERPROFILE"
         if ($syncHash.selectedFolder) {
-
             $syncHash.StatusBarText.Text = "Selected folder: $($syncHash.selectedFolder)"
             $syncHash.fileSystemListBoxLabelFOLDERNAME_value.Content = $syncHash.selectedFolder
-
             Invoke-SelectedFolderAclCheck -selectedFolder $syncHash.selectedFolder
-        }#end if
-
+        }
     })#end fileSystemSelectFolderButton.Add_Click
 
     $syncHash.fileSystemEnableFolderAuditingButton.Add_MouseLeave({
@@ -358,19 +362,9 @@ $psMainWindow = [PowerShell]::Create().AddScript({
 
 if (-not($NoGUI)) {
     $psMainWindow.Runspace = $mainRunspace
-    $main = $psMainWindow.BeginInvoke()
+    [void]$psMainWindow.BeginInvoke()
 }
 
 ########################
 #END MAIN WINDOW
 ########################
-<#
-
-== To Do ==============================================================
-    1. Have the 'Modify' button open up selected folder properties.
-=======================================================================
-
-$psMainWindow.EndInvoke($main)
-$mainRunspace.Close()
-
-#>
