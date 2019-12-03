@@ -6,4 +6,6 @@ https://searchitchannel.techtarget.com/feature/Using-AuditPol-to-audit-Windows-u
 
 https://www.morgantechspace.com/2013/11/Enable-File-System-Auditing-in-Windows.html
 
-``
+http://www.systanddeploy.com/2018/10/change-datagrid-rows-color-depending-of.html
+
+https://stackoverflow.com/a/57494414
