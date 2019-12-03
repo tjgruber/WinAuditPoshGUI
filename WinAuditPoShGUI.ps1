@@ -1,18 +1,13 @@
 <# WinAuditPoShGUI | by Timothy Gruber
 
 Windows Auditing PowerShell GUI
-    Version: 2019.12.03.01
+    Version: 2019.12.03.02
 
 Designed and written by Timothy Gruber:
     https://timothygruber.com
     https://github.com/tjgruber/WinAuditPoshGUI
 
 #>
-
-[cmdletbinding()]
-    param(
-        [Switch]$NoGUI #will be used in future
-    )
 
 #region Run script as elevated admin and unrestricted executionpolicy
     $myWindowsID = [System.Security.Principal.WindowsIdentity]::GetCurrent()
@@ -360,10 +355,8 @@ $psMainWindow = [PowerShell]::Create().AddScript({
     $syncHash.Error = $Error
 })
 
-if (-not($NoGUI)) {
-    $psMainWindow.Runspace = $mainRunspace
-    [void]$psMainWindow.BeginInvoke()
-}
+$psMainWindow.Runspace = $mainRunspace
+[void]$psMainWindow.BeginInvoke()
 
 ########################
 #END MAIN WINDOW
